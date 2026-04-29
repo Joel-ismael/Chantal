@@ -9,7 +9,7 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Ges-Projets Pro", page_icon="💻", layout="wide")
 
-# --- DONNÉES PAYS & VALIDATION ---
+# --- DONNÉES PAYS ---
 PAYS_DATA = {
     "Cameroun": {"code": "+237", "regex": r"^\d{9}$"},
     "France": {"code": "+33", "regex": r"^\d{9}$"},
@@ -18,11 +18,11 @@ PAYS_DATA = {
     "Canada": {"code": "+1", "regex": r"^\d{10}$"}
 }
 
-LANGAGES_LIST = ["Python", "JavaScript", "C++", "Java", "PHP", "Swift", "Kotlin", "Rust", "Go", "TypeScript", "C#", "Ruby", "AUTRE (Saisir manuellement)"]
+LANGAGES_LIST = ["Python", "JavaScript", "C++", "Java", "PHP", "Swift", "Kotlin", "Rust", "Go", "TypeScript", "C#", "Ruby", "AUTRE"]
 
 # --- BASE DE DONNÉES ---
 def init_db():
-    conn = sqlite3.connect('ges_projets_v3.db', check_same_thread=False)
+    conn = sqlite3.connect('ges_projets_final.db', check_same_thread=False)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users (
                 email TEXT PRIMARY KEY, nom TEXT, prenom TEXT, 
@@ -49,12 +49,12 @@ def main():
         tab_login, tab_signup = st.tabs(["Se Connecter", "S'inscrire"])
 
         with tab_login:
-            with st.form("login_form"):
+            with st.form("login"):
                 l_nom = st.text_input("Nom")
-                l_prenom = st.text_input("Prénom")
+                l_pre = st.text_input("Prénom")
                 l_pw = st.text_input("Mot de passe", type='password')
                 if st.form_submit_button("Connexion"):
-                    c.execute('SELECT * FROM users WHERE nom=? AND prenom=? AND password=?', (l_nom, l_prenom, hash_pwd(l_pw)))
+                    c.execute('SELECT * FROM users WHERE nom=? AND prenom=? AND password=?', (l_nom, l_pre, hash_pwd(l_pw)))
                     user = c.fetchone()
                     if user:
                         st.session_state.auth, st.session_state.user = True, list(user)
@@ -62,7 +62,7 @@ def main():
                     else: st.error("Identifiants incorrects.")
 
         with tab_signup:
-            with st.form("signup_form"):
+            with st.form("signup"):
                 col1, col2 = st.columns(2)
                 with col1:
                     s_nom, s_pre = st.text_input("Nom"), st.text_input("Prénom")
@@ -76,12 +76,13 @@ def main():
                         try:
                             c.execute('INSERT INTO users VALUES (?,?,?,?,?,?,?)', (s_em, s_nom, s_pre, f"{PAYS_DATA[s_pa]['code']} {s_ph}", hash_pwd(s_pw), s_sex, s_pa))
                             conn.commit()
-                            st.success("🎉 Compte créé ! Connectez-vous.")
+                            st.success("Compte créé ! Connectez-vous.")
                         except: st.error("Email déjà utilisé.")
-                    else: st.error("Format de numéro invalide.")
+                    else: st.error("Numéro invalide.")
 
     else:
         u_email = st.session_state.user[0]
+        # MISE À JOUR BARRE LATÉRALE (Image corrig.jpg)
         st.sidebar.title("🚀 KERIANE")
         st.sidebar.caption("Ges-Projets (Suivi de Projets & Productivité)")
         
@@ -103,86 +104,73 @@ def main():
                     st.success("Profil mis à jour !")
 
         elif menu == "Collecte de Données":
-            t_saisie, t_analyse, t_modif = st.tabs(["📥 Saisie", "🥧 Analyse", "🛠️ Gestion"])
+            t_s = st.tabs(["📥 Saisie", "🥧 Analyse", "🛠️ Gestion"])
 
-            with t_saisie:
-                with st.form("saisie_p"):
+            with t_s[0]:
+                with st.form("saisie"):
                     p_nom = st.text_input("Nom du Projet")
                     col_l1, col_l2 = st.columns(2)
-                    p_lang_opt = col_l1.selectbox("Choisir le langage", LANGAGES_LIST)
-                    p_lang_custom = col_l2.text_input("Ou saisir le langage manuellement")
-                    p_lang_final = p_lang_custom if p_lang_opt == "AUTRE (Saisir manuellement)" else p_lang_opt
+                    p_opt = col_l1.selectbox("Langage", LANGAGES_LIST)
+                    p_custom = col_l2.text_input("Si AUTRE, écrivez ici")
+                    p_lang = p_custom if p_opt == "AUTRE" else p_opt
                     
-                    colA, colB = st.columns(2)
-                    p_h = colA.number_input("Heures passées", min_value=0.0, value=0.1, step=0.1)
-                    p_st = colB.selectbox("Statut actuel", ["En attente", "En cours", "Terminé", "En pause"])
+                    c1, c2 = st.columns(2)
+                    p_h = c1.number_input("Heures", min_value=0.0, value=0.0, step=0.1)
+                    p_st = c2.selectbox("Statut", ["En attente", "En cours", "Terminé", "En pause"])
                     
                     st.write("---")
-                    st.subheader("Informations Complémentaires")
-                    c1, c2, c3 = st.columns(3)
-                    p_prio = c1.select_slider("Priorité", options=["Basse", "Moyenne", "Haute", "Urgente"])
-                    p_client = c2.text_input("Client / Organisation")
-                    p_budget = c3.number_input("Budget estimé", min_value=0.0, value=0.0, step=100.0)
+                    st.subheader("Infos importantes")
+                    colA, colB, colC = st.columns(3)
+                    p_prio = colA.select_slider("Priorité", ["Basse", "Moyenne", "Haute", "Urgente"])
+                    p_cli = colB.text_input("Client")
+                    p_bud = colC.number_input("Budget", min_value=0.0, value=0.0)
                     
-                    c4, c5, c6 = st.columns(3)
-                    p_plat = c4.selectbox("Plateforme cible", ["Web", "Mobile Android", "iOS", "Desktop", "API/Backend"])
-                    p_diff = c5.selectbox("Difficulté", ["Facile", "Intermédiaire", "Complexe"])
-                    p_dead = c6.date_input("Deadline prévue")
+                    colD, colE, colF = st.columns(3)
+                    p_plat = colD.selectbox("Plateforme", ["Web", "Mobile", "Desktop", "API"])
+                    p_diff = colE.selectbox("Difficulté", ["Facile", "Moyen", "Difficile"])
+                    p_dead = colF.date_input("Deadline")
                     
-                    p_note = st.text_area("Notes détaillées")
+                    p_note = st.text_area("Notes")
                     
-                    if st.form_submit_button("Enregistrer la donnée"):
+                    if st.form_submit_button("Enregistrer"):
                         c.execute('''INSERT INTO projets (user_email, date, nom_projet, langage, heures, statut, priorite, client, budget, plateforme, difficulte, deadline, notes) 
                                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                                 (u_email, datetime.now().strftime("%d/%m/%Y"), p_nom, p_lang_final, float(p_h), p_st, p_prio, p_client, float(p_budget), p_plat, p_diff, str(p_dead), p_note))
+                                 (u_email, datetime.now().strftime("%d/%m/%Y"), p_nom, p_lang, float(p_h), p_st, p_prio, p_cli, float(p_bud), p_plat, p_diff, str(p_dead), p_note))
                         conn.commit()
                         st.success("Projet enregistré !")
 
-            with t_analyse:
-                c.execute('SELECT langage, heures, nom_projet, statut FROM projets WHERE user_email=?', (u_email,))
+            with t_s[1]:
+                c.execute('SELECT langage, heures, nom_projet FROM projets WHERE user_email=?', (u_email,))
                 data = c.fetchall()
                 if data:
-                    df = pd.DataFrame(data, columns=["Langage", "Heures", "Projet", "Statut"])
+                    df = pd.DataFrame(data, columns=["Langage", "Heures", "Projet"])
                     st.plotly_chart(px.pie(df, values='Heures', names='Langage', hole=0.4), use_container_width=True)
-                    st.dataframe(df, use_container_width=True)
                 else: st.info("Aucune donnée.")
 
-            with t_modif:
-                c.execute('SELECT id, nom_projet, date FROM projets WHERE user_email=?', (u_email,))
+            with t_s[2]:
+                c.execute('SELECT id, nom_projet FROM projets WHERE user_email=?', (u_email,))
                 rows = c.fetchall()
                 if rows:
-                    opt = {f"ID:{r[0]} | {r[1]} ({r[2]})": r[0] for r in rows}
-                    sel_id = opt[st.selectbox("Choisir le projet à modifier", list(opt.keys()))]
-                    
+                    opt = {f"ID:{r[0]} | {r[1]}": r[0] for r in rows}
+                    sel_id = opt[st.selectbox("Projet à modifier", list(opt.keys()))]
                     c.execute('SELECT * FROM projets WHERE id=?', (sel_id,))
                     curr = c.fetchone()
                     
-                    # CORRECTION ICI : Conversion explicite en float pour éviter l'erreur de bornes JS
-                    val_heures = float(curr[5]) if curr[5] is not None else 0.0
-                    val_budget = float(curr[9]) if curr[9] is not None else 0.0
-
-                    st.write("---")
-                    with st.form("edit_f"):
-                        st.subheader(f"Modification de : {curr[3]}")
-                        e_nom = st.text_input("Nom du projet", value=str(curr[3]))
-                        e_lang = st.text_input("Langage utilisé", value=str(curr[4]))
+                    with st.form("edit"):
+                        # PROTECTION ANTI-ERREUR JS
+                        h_val = float(curr[5]) if curr[5] else 0.0
+                        b_val = float(curr[9]) if curr[9] else 0.0
                         
-                        col1, col2, col3 = st.columns(3)
-                        # On force min_value pour garantir que la valeur actuelle est toujours valide
-                        e_h = col1.number_input("Heures", min_value=0.0, value=val_heures, step=0.1)
-                        e_st = col2.selectbox("Statut", ["En attente", "En cours", "Terminé", "En pause"])
-                        e_bud = col3.number_input("Budget", min_value=0.0, value=val_budget, step=100.0)
-                        
-                        e_note = st.text_area("Notes", value=str(curr[13] if curr[13] else ""))
-                        
-                        if st.form_submit_button("💾 Mettre à jour"):
-                            c.execute('''UPDATE projets SET nom_projet=?, langage=?, heures=?, statut=?, budget=?, notes=? 
-                                         WHERE id=?''', (e_nom, e_lang, float(e_h), e_st, float(e_bud), e_note, sel_id))
+                        e_nom = st.text_input("Nom", value=str(curr[3]))
+                        e_h = st.number_input("Heures", min_value=0.0, value=h_val)
+                        e_st = st.selectbox("Statut", ["En attente", "En cours", "Terminé", "En pause"])
+                        e_bud = st.number_input("Budget", min_value=0.0, value=b_val)
+                        if st.form_submit_button("Mettre à jour"):
+                            c.execute('UPDATE projets SET nom_projet=?, heures=?, statut=?, budget=? WHERE id=?', (e_nom, float(e_h), e_st, float(e_bud), sel_id))
                             conn.commit()
-                            st.success("Données mises à jour !")
+                            st.success("Mis à jour !")
                             st.rerun()
-                    
-                    if st.button("🗑️ Supprimer ce projet"):
+                    if st.button("Supprimer"):
                         c.execute('DELETE FROM projets WHERE id=?', (sel_id,))
                         conn.commit()
                         st.rerun()
