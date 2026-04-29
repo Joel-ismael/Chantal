@@ -18,7 +18,7 @@ PAYS_DATA = {
     "Canada": {"code": "+1", "regex": r"^\d{10}$"}
 }
 
-# --- CSS : DESIGN PROFESSIONNEL ---
+# --- CSS : DESIGN ---
 st.markdown("""
     <style>
     .stApp {
@@ -34,13 +34,11 @@ st.markdown("""
 
 # --- BASE DE DONNÉES ---
 def init_db():
-    conn = sqlite3.connect('ges_projets.db', check_same_thread=False)
+    conn = sqlite3.connect('ges_projets_v2.db', check_same_thread=False)
     c = conn.cursor()
-    # Table Utilisateurs
     c.execute('''CREATE TABLE IF NOT EXISTS users (
                 email TEXT PRIMARY KEY, nom TEXT, prenom TEXT, 
                 phone TEXT, password TEXT, sex TEXT, pays TEXT)''')
-    # Table Projets (Collecte de données)
     c.execute('''CREATE TABLE IF NOT EXISTS projets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, user_email TEXT, 
                 date TEXT, nom_projet TEXT, langage TEXT, heures REAL, 
@@ -52,17 +50,13 @@ conn, c = init_db()
 
 def hash_pwd(pwd): return hashlib.sha256(str.encode(pwd)).hexdigest()
 
-# --- GESTION DE LA SESSION ---
 if 'auth' not in st.session_state:
     st.session_state.auth = False
     st.session_state.user = None
-    st.session_state.page = "login_signup"
 
-# --- INTERFACE DE CONNEXION / INSCRIPTION ---
 def main():
     if not st.session_state.auth:
         st.title("💻 Ges-Projets (Suivi de Performance)")
-        
         tab_login, tab_signup = st.tabs(["Se Connecter", "S'inscrire"])
 
         with tab_login:
@@ -96,17 +90,13 @@ def main():
                             c.execute('INSERT INTO users VALUES (?,?,?,?,?,?,?)', 
                                      (s_em, s_nom, s_pre, f"{PAYS_DATA[s_pa]['code']} {s_ph}", hash_pwd(s_pw), s_sex, s_pa))
                             conn.commit()
-                            st.success("🎉 Compte créé avec succès !")
-                            st.info("Cliquez sur 'Se Connecter' ci-dessus pour entrer.")
-                        except: st.error("Cet email est déjà enregistré.")
-                    else: st.error(f"Le format du numéro pour le {s_pa} est invalide.")
+                            st.success("🎉 Compte créé ! Connectez-vous maintenant.")
+                        except: st.error("Cet email existe déjà.")
+                    else: st.error("Format de numéro invalide.")
 
     else:
-        # --- INTERFACE APPLICATION APRÈS CONNEXION ---
         u_email = st.session_state.user[0]
-        st.sidebar.title(f"🚀 Ges-Projets")
-        st.sidebar.write(f"Utilisateur : **{st.session_state.user[2]}**")
-        
+        st.sidebar.title(f"🚀 KERIANE")
         menu = st.sidebar.selectbox("Menu", ["Collecte de Données", "Mon Profil", "Déconnexion"])
 
         if menu == "Déconnexion":
@@ -114,76 +104,48 @@ def main():
             st.rerun()
 
         elif menu == "Mon Profil":
-            st.header("👤 Mes Informations Personnelles")
+            st.header("👤 Modifier mon Profil")
             with st.form("edit_profile"):
-                new_nom = st.text_input("Nom", value=st.session_state.user[1])
-                new_pre = st.text_input("Prénom", value=st.session_state.user[2])
-                new_em = st.text_input("Email (identifiant)", value=st.session_state.user[0], disabled=True)
-                new_ph = st.text_input("Téléphone", value=st.session_state.user[3])
-                if st.form_submit_button("Mettre à jour le profil"):
-                    c.execute('UPDATE users SET nom=?, prenom=?, phone=? WHERE email=?', (new_nom, new_pre, new_ph, u_email))
+                n_nom = st.text_input("Nom", value=st.session_state.user[1])
+                n_pre = st.text_input("Prénom", value=st.session_state.user[2])
+                n_ph = st.text_input("Téléphone", value=st.session_state.user[3])
+                if st.form_submit_button("Sauvegarder"):
+                    c.execute('UPDATE users SET nom=?, prenom=?, phone=? WHERE email=?', (n_nom, n_pre, n_ph, u_email))
                     conn.commit()
                     st.success("Profil mis à jour !")
 
         elif menu == "Collecte de Données":
-            st.header("📊 Gestion des Projets")
-            t_saisie, t_analyse, t_modif = st.tabs(["📥 Nouvelle Donnée", "🥧 Analyse Graphique", "🛠️ Modifier/Supprimer"])
+            t_saisie, t_analyse, t_modif = st.tabs(["📥 Saisie", "🥧 Analyse", "🛠️ Gestion"])
 
             with t_saisie:
-                with st.form("saisie_projet"):
+                with st.form("saisie_p"):
                     p_nom = st.text_input("Nom du Projet")
-                    p_lang = st.selectbox("Langage principal", ["Python", "JavaScript", "HTML/CSS", "Java", "C++", "PHP", "SQL"])
-                    col_h, col_s = st.columns(2)
-                    p_heure = col_h.number_input("Heures de travail", 0.1)
-                    p_statut = col_s.selectbox("Statut", ["En cours", "Terminé", "En pause"])
-                    p_note = st.text_area("Notes additionnelles")
-                    if st.form_submit_button("Enregistrer le projet"):
-                        c.execute('INSERT INTO projets (user_email, date, nom_projet, langage, heures, statut, notes) VALUES (?,?,?,?,?,?,?)',
-                                 (u_email, datetime.now().strftime("%d/%m/%Y"), p_nom, p_lang, p_heure, p_statut, p_note))
+                    p_lang = st.selectbox("Langage", ["Python", "JavaScript", "C++", "Java", "PHP"])
+                    p_h = st.number_input("Heures", 0.5)
+                    p_st = st.selectbox("Statut", ["En cours", "Terminé"])
+                    if st.form_submit_button("Enregistrer"):
+                        c.execute('INSERT INTO projets (user_email, date, nom_projet, langage, heures, statut) VALUES (?,?,?,?,?,?)',
+                                 (u_email, datetime.now().strftime("%d/%m/%Y"), p_nom, p_lang, p_h, p_st))
                         conn.commit()
-                        st.success("Donnée enregistrée !")
+                        st.success("Donnée ajoutée !")
 
             with t_analyse:
-                c.execute('SELECT date, nom_projet, langage, heures, statut FROM projets WHERE user_email=?', (u_email,))
+                c.execute('SELECT langage, heures, nom_projet FROM projets WHERE user_email=?', (u_email,))
                 data = c.fetchall()
                 if data:
-                    df = pd.DataFrame(data, columns=["Date", "Projet", "Langage", "Heures", "Statut"])
-                    st.subheader("Visualisation de l'effort par Langage")
-                    fig = px.pie(df, values='Heures', names='Langage', hole=0.4, title="Répartition du temps (Heures)")
-                    st.plotly_chart(fig, use_container_width=True)
-                    st.subheader("Historique des saisies")
+                    df = pd.DataFrame(data, columns=["Langage", "Heures", "Projet"])
+                    st.plotly_chart(px.pie(df, values='Heures', names='Langage', hole=0.4), use_container_width=True)
                     st.dataframe(df, use_container_width=True)
-                else: st.info("Aucune donnée enregistrée.")
+                else: st.info("Aucune donnée.")
 
             with t_modif:
                 c.execute('SELECT id, nom_projet, date FROM projets WHERE user_email=?', (u_email,))
                 rows = c.fetchall()
                 if rows:
-                    options = {f"{r[1]} (le {r[2]})": r[0] for r in rows}
-                    sel_nom = st.selectbox("Sélectionner une donnée à modifier", list(options.keys()))
-                    sel_id = options[sel_nom]
-
-                    # Récupérer les données actuelles
-                    c.execute('SELECT * FROM projets WHERE id=?', (sel_id,))
-                    curr = c.fetchone()
-
-                    with st.form("edit_data"):
-                        st.subheader("Modifier tous les paramètres")
-                        e_nom = st.text_input("Nom du projet", value=curr[3])
-                        e_lang = st.selectbox("Langage", ["Python", "JavaScript", "HTML/CSS", "Java", "C++", "PHP", "SQL"], index=0)
-                        e_heure = st.number_input("Heures", value=curr[5])
-                        e_statut = st.selectbox("Statut", ["En cours", "Terminé", "En pause"], index=0)
-                        e_note = st.text_area("Notes", value=curr[7])
-                        
-                        if st.form_submit_button("Mettre à jour cette donnée"):
-                            c.execute('''UPDATE projets SET nom_projet=?, langage=?, heures=?, statut=?, notes=? 
-                                         WHERE id=?''', (e_nom, e_lang, e_heure, e_statut, e_note, sel_id))
-                            conn.commit()
-                            st.success("Donnée mise à jour !")
-                            st.rerun()
-                    
-                    if st.button("🗑️ Supprimer définitivement"):
-                        c.execute('DELETE FROM projets WHERE id=?', (sel_id,))
+                    opt = {f"{r[1]} ({r[2]})": r[0] for r in rows}
+                    sel = st.selectbox("Sélectionner", list(opt.keys()))
+                    if st.button("Supprimer"):
+                        c.execute('DELETE FROM projets WHERE id=?', (opt[sel],))
                         conn.commit()
                         st.rerun()
 
